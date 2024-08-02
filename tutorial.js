@@ -2,11 +2,16 @@ const path = require('path');
 const fse = require('fs-extra');
 const { Proskomma } = require('proskomma');
 const pk = new Proskomma();
-let content = fse.readFileSync(path.resolve(__dirname, './43-LUK-en-UST.usfm')).toString();
 const fs = require('fs');
 
 
-const setup = async function (pk) {
+async function setup(pk) {
+    addDocument(pk, './documents/43-LUK-en-UST.usfm')
+    addDocument(pk, './documents/41-MAT-ULT.usfm')
+ }
+
+ async function addDocument(pk, contentPath) {
+    let content = fse.readFileSync(path.resolve(__dirname, contentPath)).toString();
 
     const mutation = `mutation { addDocument(` +
     `selectors: [{key: "lang", value: "eng"}, {key: "abbr", value: "ust"}], ` + // TODO: set this dynamically
@@ -16,7 +21,7 @@ const setup = async function (pk) {
     const result = await pk.gqlQuery(mutation);
     let cvData = result.data
     console.log(JSON.stringify(result, null, 2));
- }
+}
 
 
 // DATA TYPES THAT I NEED TO PARSE INTO
@@ -37,29 +42,24 @@ const setup = async function (pk) {
 // }
 
 
-function getStrongs(str) {
-    const regex = /\b[Gg]\d+\b/;
-    const match = str.match(regex);
-    
-    if (match) {
-      const extracted = match[0];
-    //   console.log(extracted);
-      return extracted
-    } else {
-      console.log("No match found.");
-      // TODO: return undefined
+
+// TODO: refine this so that it takes in a document ID, so we are not running this query on all documents. 
+ async function getAlignedVerses(pk, chapter) {
+    const dataQuery = `
+    {
+        documents {
+            id
+            cv(chapter: "${chapter}") {
+                items {
+                    subType
+                    payload
+                }
+            }
+        }
     }
-}
+    `;
 
-function getLemma(str) {
-    const regex = /[^/]+$/;
-    const lemma = str.match(regex)[0];
-    return lemma
-}
-
-
- const queryPk = async function (pk, query) {
-    const result = await pk.gqlQuery(query);
+    const result = await pk.gqlQuery(dataQuery);
     let cvData = result.data.documents[0].cv[0].items.filter((item) => 
         item.payload === "milestone/zaln" || item.subType === "wordLike" 
         || (item.payload.includes("x-strong") && item.subType === "start")
@@ -113,7 +113,7 @@ function getLemma(str) {
     const jsonString = JSON.stringify(alignedVerses, null, 2);
 
     // Define the file path
-    const filePath = './sampleObject.json';
+    const filePath = './output/sampleObject.json';
 
     // Write the JSON string to a file
     fs.writeFile(filePath, jsonString, (err) => {
@@ -126,39 +126,51 @@ function getLemma(str) {
  }
 
 
-
-// TODO NOTE: this one is key. Notice that the start and end zaln's are noticed and they enclose some amount
-//  of wordLike tags. It also contains the strongs information as an attribute. 
-// const dataQuery = `
-// {
-//     documents {
-//         id
-//         cv(chapter: "1", verses: ["1"]) {
-//             items {
-//                 subType
-//                 payload
-//             }
-//         }
-//     }
-// }
-// `;
-
-// TODO NOTE: this gets all the verses for the chapter. 
-const dataQuery = `
-{
-    documents {
-        id
-        cv(chapter: "1") {
-            items {
-                subType
-                payload
-            }
-        }
+ function getStrongs(str) {
+    const regex = /\b[Gg]\d+\b/;
+    const match = str.match(regex);
+    
+    if (match) {
+      const extracted = match[0];
+      return extracted
+    } else {
+      console.log("No match found.");
     }
 }
-`;
 
+function getLemma(str) {
+    const regex = /[^/]+$/;
+    const lemma = str.match(regex)[0];
+    return lemma
+}
+
+
+
+async function getBookChapterFormat(pk) {
+    const bookChapterQuery = `
+    {
+    
+      documents {
+        id
+        headers {
+            key
+            value
+        }
+        chapters: cIndexes {
+            chapter
+        }
+      }
+    
+    }   
+    `;
+
+    const result = await pk.gqlQuery(query);
+
+    // TODO: add filter/map logic here. 
+
+    return result
+}
 
 setup(pk);
 
-queryPk(pk, dataQuery);
+getAlignedVerses(pk, 1)
