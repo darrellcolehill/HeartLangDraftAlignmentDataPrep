@@ -43,24 +43,27 @@ async function setup(pk) {
 
 
 
-// TODO: refine this so that it takes in a document ID, so we are not running this query on all documents. 
- async function getAlignedVerses(pk, bookCode, chapter) {
+// TODO: refine this so that it takes in a docSet ID 
+// TODO: have this take in the source target/version so it can be added to the file names as well. 
+ async function getAlignedVerses(pk, bookDocumentID, bookCode, chapter) {
     const dataQuery = `
     {
-        documents {
-            id
-            cv(chapter: "${chapter}") {
-                items {
-                    subType
-                    payload
+        docSets {
+            documents(ids: ["${bookDocumentID}"]) {
+                cv(chapter: "${chapter}") {
+                    items {
+                        subType
+                        payload
+                    }
                 }
             }
         }
+
     }
     `;
 
     const result = await pk.gqlQuery(dataQuery);
-    let cvData = result.data.documents[0].cv[0].items.filter((item) => 
+    let cvData = result.data.docSets[0].documents[0].cv[0].items.filter((item) => 
         item.payload === "milestone/zaln" || item.subType === "wordLike" 
         || (item.payload.includes("x-strong") && item.subType === "start")
         || (item.payload.includes("x-lemma") && item.subType === "start")
@@ -117,7 +120,7 @@ async function setup(pk) {
         if (err) {
             console.error('Error writing to file', err);
         } else {
-            console.log('JSON file has been saved');
+            console.log(`Saved JSON for ${bookCode}`);
         }
     });
  }
@@ -143,16 +146,14 @@ function getLemma(str) {
 
 
 
+// TODO: run this per-docSet. That will be necessary once we have different languages with different
+//  versions. 
 async function getBookChapterFormat(pk) {
     const bookChapterQuery = `
     {
-    
       documents {
+        slug: header(id:"bookCode")
         id
-        headers {
-            key
-            value
-        }
         chapters: cIndexes {
             chapter
         }
@@ -165,17 +166,10 @@ async function getBookChapterFormat(pk) {
 
     let mappedDocuments = result.data.documents.map( document => {
 
-        let bookCode = document.headers.filter(element => {
-            if(element.key === "bookCode") {
-                return true
-            }
-            return false
-        })[0]?.value;
-
         let mappedDocument = {
             chapters: document.chapters.length,
             id: document.id,
-            bookCode: bookCode
+            slug: document.slug
         }
 
         return mappedDocument
@@ -186,4 +180,18 @@ async function getBookChapterFormat(pk) {
 
 setup(pk);
 
-// getAlignedVerses(pk, 1)
+async function processDocuments() {
+    let loadedDocuments = await getBookChapterFormat(pk)
+    loadedDocuments.forEach(document => {
+        processBook(document)
+    });
+    
+}
+
+async function processBook(bookDocument) {
+    for(let i = 1; i <= bookDocument.chapters; i++) {
+        getAlignedVerses(pk, bookDocument.id, bookDocument.slug, i)
+    }
+}
+
+processDocuments()
