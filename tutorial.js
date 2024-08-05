@@ -3,28 +3,82 @@ const fse = require('fs-extra');
 const { Proskomma } = require('proskomma');
 const pk = new Proskomma();
 const fs = require('fs');
+const util = require('util');
+
+const readdir = util.promisify(fs.readdir);
+const INPUT_DIRECTORY_ROOT = "./documents"
+
+// TODO: update this so that it works with other language codes like "hi"
+const languageCodeMap = {
+    "en": "eng"
+}
 
 
 async function setup(pk) {
-    addDocument(pk, './documents/43-LUK-en-UST.usfm')
-    addDocument(pk, './documents/41-MAT-ULT.usfm')
- }
 
- async function addDocument(pk, contentPath) {
+    let directories = await getDirectories(INPUT_DIRECTORY_ROOT)
+
+    directories.forEach(async (directory) => {
+        let {language, version} = getLanguageAndVersion(directory)
+        
+        let usfmFiles = await getUsfmFiles(`${INPUT_DIRECTORY_ROOT}/${directory}`)
+
+        usfmFiles.forEach(usfmFile => {
+            const usfmFileContentPath = `${INPUT_DIRECTORY_ROOT}/${directory}/${usfmFile}`
+            addDocument(pk, usfmFileContentPath, language, version)
+        })
+    })
+}
+
+
+async function getDirectories(source) {
+    return (await readdir(source, { withFileTypes: true }))
+      .filter(dirent => dirent.isDirectory())
+      .map(dirent => dirent.name)
+}
+
+
+function getLanguageAndVersion(projectName) {
+
+    // Extracts the language and version from aligned bibles on Door43 from projects in the from of
+    // langCode_version
+    const repoNamePattern = /^([^_]+)_(.+)$/;
+    const match = projectName.match(repoNamePattern);
+
+    if (match) {
+        const language = match[1]; 
+        const version = match[2];
+        return {language: languageCodeMap[language], version: version}
+    } else {
+        console.error(`Could not extract language code and version from project ${projectName}.`);
+    }
+}
+
+async function getUsfmFiles(directory) {
+    try {
+        const files = await readdir(directory);
+        return files.filter(file => path.extname(file).toLowerCase() === '.usfm');
+    } catch (err) {
+        console.error('Error reading directory:', err);
+        return [];
+    }
+}
+
+async function addDocument(pk, contentPath, language, version) {
     let content = fse.readFileSync(path.resolve(__dirname, contentPath)).toString();
 
     const mutation = `mutation { addDocument(` +
-    `selectors: [{key: "lang", value: "eng"}, {key: "abbr", value: "ust"}], ` + // TODO: set this dynamically
+    `selectors: [{key: "lang", value: "${language}"}, {key: "abbr", value: "${version}"}], ` +
     `contentType: "usfm", ` +
     `content: """${content}""") }`;
 
     const result = await pk.gqlQuery(mutation);
     let cvData = result.data
     console.log(JSON.stringify(result, null, 2));
- }
+}
 
 
-// DATA TYPES THAT I NEED TO PARSE INTO
+// DATA TYPES
 //  type GreekAlignmentData = {
 // 	strong: string;
 // 	morph?: string;
@@ -178,8 +232,6 @@ async function getBookChapterFormat(pk) {
     return mappedDocuments
 }
 
-setup(pk);
-
 async function processDocuments() {
     let loadedDocuments = await getBookChapterFormat(pk)
     loadedDocuments.forEach(document => {
@@ -194,4 +246,6 @@ async function processBook(bookDocument) {
     }
 }
 
-processDocuments()
+setup(pk);
+
+// processDocuments()
