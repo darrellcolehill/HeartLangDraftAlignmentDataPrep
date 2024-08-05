@@ -21,7 +21,7 @@ async function setup(pk) {
     const result = await pk.gqlQuery(mutation);
     let cvData = result.data
     console.log(JSON.stringify(result, null, 2));
-}
+ }
 
 
 // DATA TYPES THAT I NEED TO PARSE INTO
@@ -44,7 +44,7 @@ async function setup(pk) {
 
 
 // TODO: refine this so that it takes in a document ID, so we are not running this query on all documents. 
- async function getAlignedVerses(pk, chapter) {
+ async function getAlignedVerses(pk, bookCode, chapter) {
     const dataQuery = `
     {
         documents {
@@ -109,13 +109,10 @@ async function setup(pk) {
         }
     }
 
-    // Convert the object to a JSON string
     const jsonString = JSON.stringify(alignedVerses, null, 2);
 
-    // Define the file path
-    const filePath = './output/sampleObject.json';
+    const filePath = `./output/${bookCode}-${chapter}.json`;
 
-    // Write the JSON string to a file
     fs.writeFile(filePath, jsonString, (err) => {
         if (err) {
             console.error('Error writing to file', err);
@@ -164,13 +161,29 @@ async function getBookChapterFormat(pk) {
     }   
     `;
 
-    const result = await pk.gqlQuery(query);
+    const result = await pk.gqlQuery(bookChapterQuery);
 
-    // TODO: add filter/map logic here. 
+    let mappedDocuments = result.data.documents.map( document => {
 
-    return result
+        let bookCode = document.headers.filter(element => {
+            if(element.key === "bookCode") {
+                return true
+            }
+            return false
+        })[0]?.value;
+
+        let mappedDocument = {
+            chapters: document.chapters.length,
+            id: document.id,
+            bookCode: bookCode
+        }
+
+        return mappedDocument
+    })
+
+    return mappedDocuments
 }
 
 setup(pk);
 
-getAlignedVerses(pk, 1)
+// getAlignedVerses(pk, 1)
