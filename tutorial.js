@@ -10,24 +10,25 @@ const INPUT_DIRECTORY_ROOT = "./documents"
 
 // TODO: update this so that it works with other language codes like "hi"
 const languageCodeMap = {
-    "en": "eng"
+    "en": "eng",
+    "hi": "hin"
 }
 
 
 async function setup(pk) {
-
+    console.log("===== SETTING UP =====")
     let directories = await getDirectories(INPUT_DIRECTORY_ROOT)
 
-    directories.forEach(async (directory) => {
-        let {language, version} = getLanguageAndVersion(directory)
+    for(let i = 0; i < directories.length; i++) {
+        let {language, version} = getLanguageAndVersion(directories[i])
         
-        let usfmFiles = await getUsfmFiles(`${INPUT_DIRECTORY_ROOT}/${directory}`)
+        let usfmFiles = await getUsfmFiles(`${INPUT_DIRECTORY_ROOT}/${directories[i]}`)
 
-        usfmFiles.forEach(usfmFile => {
-            const usfmFileContentPath = `${INPUT_DIRECTORY_ROOT}/${directory}/${usfmFile}`
-            addDocument(pk, usfmFileContentPath, language, version)
-        })
-    })
+        for(let j = 0; j < usfmFiles.length; j++) {
+            const usfmFileContentPath = `${INPUT_DIRECTORY_ROOT}/${directories[i]}/${usfmFiles[j]}`
+            await addDocument(pk, usfmFileContentPath, language, version)
+        }
+    }
 }
 
 
@@ -73,8 +74,7 @@ async function addDocument(pk, contentPath, language, version) {
     `content: """${content}""") }`;
 
     const result = await pk.gqlQuery(mutation);
-    let cvData = result.data
-    console.log(JSON.stringify(result, null, 2));
+    console.log(`Added ${contentPath} to graph`)
 }
 
 
@@ -96,13 +96,10 @@ async function addDocument(pk, contentPath, language, version) {
 // }
 
 
-
-// TODO: refine this so that it takes in a docSet ID 
-// TODO: have this take in the source target/version so it can be added to the file names as well. 
- async function getAlignedVerses(pk, bookDocumentID, bookCode, chapter) {
+async function getAlignedVerses(pk, docSetID, bookDocumentID, bookCode, chapter) {
     const dataQuery = `
     {
-        docSets {
+        docSet(id: "${docSetID}") {
             documents(ids: ["${bookDocumentID}"]) {
                 cv(chapter: "${chapter}") {
                     items {
@@ -117,7 +114,7 @@ async function addDocument(pk, contentPath, language, version) {
     `;
 
     const result = await pk.gqlQuery(dataQuery);
-    let cvData = result.data.docSets[0].documents[0].cv[0].items.filter((item) => 
+    let cvData = result.data.docSet.documents[0].cv[0].items.filter((item) => 
         item.payload === "milestone/zaln" || item.subType === "wordLike" 
         || (item.payload.includes("x-strong") && item.subType === "start")
         || (item.payload.includes("x-lemma") && item.subType === "start")
@@ -168,7 +165,9 @@ async function addDocument(pk, contentPath, language, version) {
 
     const jsonString = JSON.stringify(alignedVerses, null, 2);
 
-    const filePath = `./output/${bookCode}-${chapter}.json`;
+    // TODO: have this make a folder for each docSetID, and place the output there, That way it is not all one blob
+
+    const filePath = `./output/${docSetID}-${bookCode}-${chapter}.json`;
 
     fs.writeFile(filePath, jsonString, (err) => {
         if (err) {
@@ -185,67 +184,88 @@ async function addDocument(pk, contentPath, language, version) {
     const match = str.match(regex);
     
     if (match) {
-      const extracted = match[0];
-      return extracted
+      const strong = match[0];
+      return strong
     } else {
       console.log("No match found.");
     }
 }
 
+
 function getLemma(str) {
     const regex = /[^/]+$/;
-    const lemma = str.match(regex)[0];
-    return lemma
+    const match = str.match(regex);
+
+    if (match[0]) {
+        const lemma = match[0];
+        return lemma
+      } else {
+        console.log("No match found.");
+      }
 }
 
 
-
-// TODO: run this per-docSet. That will be necessary once we have different languages with different
-//  versions. 
 async function getBookChapterFormat(pk) {
-    const bookChapterQuery = `
+
+    const bookChapterQuery =  `
     {
-      documents {
-        slug: header(id:"bookCode")
-        id
-        chapters: cIndexes {
-            chapter
+        docSets {
+            id
+            documents {
+                slug: header(id:"bookCode")
+                id
+                chapters: cIndexes {
+                    chapter
+                }
+            }
         }
-      }
-    
-    }   
-    `;
+    }
+    `
 
     const result = await pk.gqlQuery(bookChapterQuery);
 
-    let mappedDocuments = result.data.documents.map( document => {
-
-        let mappedDocument = {
-            chapters: document.chapters.length,
-            id: document.id,
-            slug: document.slug
+    const mappedDocSets = result.data.docSets.map( docSet => {
+        
+        const mappedDocuments = docSet.documents.map( document => {
+            const mappedDocument = {
+                chapters: document.chapters.length,
+                id: document.id,
+                slug: document.slug
+            }
+            return mappedDocument
+        }) 
+        
+        return {
+            id: docSet.id,
+            documents: mappedDocuments
         }
-
-        return mappedDocument
     })
 
-    return mappedDocuments
+    return mappedDocSets
 }
 
 async function processDocuments() {
-    let loadedDocuments = await getBookChapterFormat(pk)
-    loadedDocuments.forEach(document => {
-        processBook(document)
-    });
+    let loadedDocSets = await getBookChapterFormat(pk)
+
+    loadedDocSets.forEach(docSet => {
+        docSet.documents.forEach(document => {
+            processBook(docSet.id, document)
+        })
+    })
+
     
 }
 
-async function processBook(bookDocument) {
+async function processBook(docSetID, bookDocument) {
     for(let i = 1; i <= bookDocument.chapters; i++) {
-        getAlignedVerses(pk, bookDocument.id, bookDocument.slug, i)
+        getAlignedVerses(pk, docSetID, bookDocument.id, bookDocument.slug, i)
     }
 }
 
-setup(pk);
 
-// processDocuments()
+async function main(){
+    await setup(pk)
+    processDocuments()
+}
+
+main()
