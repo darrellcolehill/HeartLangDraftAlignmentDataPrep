@@ -143,8 +143,6 @@ async function getAlignedVerses(pk, docSetID, bookDocumentID, bookCode, chapter)
             text += startingChar + attribute.payload;
         } else if(attribute.subType === "start" && attribute.payload.includes("x-strong")) {
             greekAlignmentData.push({strong: getStrongs(attribute.payload)});
-        } else if(attribute.subType === "start" && attribute.payload.includes("x-lemma")) {
-            greekAlignmentData.push({lemma: getLemma(attribute.payload)});
         } else if(attribute.subType === "end" && attribute.payload.includes("verse/")) {
             alignedVerses.push({verseNum: verseNum, alignedVerseText: alignedText})
             verseNum++;
@@ -184,20 +182,21 @@ async function getAlignedVerses(pk, docSetID, bookDocumentID, bookCode, chapter)
  }
 
 
+ // Gets 4 digit strongs. In the case of G12345, it matches on G1234. 
  function getStrongs(str) {
-    const regex = /\b[Gg]\d+\b/;
+    const regex = /\bG(\d{4})\d*\b/;
     const match = str.match(regex);
     
     if (match) {
-      const strong = match[0];
-      return strong
+        const strong = 'g' + match[1];
+        return strong;
     } else {
-      console.log("No match found.");
+        console.log("No match found.");
     }
 }
 
 
-function getLemma(str) {
+function getLemmaFromUsfm(str) {
     const regex = /[^/]+$/;
     const match = str.match(regex);
 
