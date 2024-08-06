@@ -2,32 +2,14 @@ const path = require('path');
 const fse = require('fs-extra');
 const fs = require('fs');
 const util = require('util');
+const dbModule = require('./database');
 
 const readdir = util.promisify(fs.readdir);
 const INPUT_DIRECTORY_ROOT = "./output"
 
-// TODO: update this so that it works with other language codes like "hi"
-// TODO: add this to global constants file
-const languageCodeMap = {
-    "en": "eng",
-    "hi": "hin"
-}
-
-// DONE: get all sub-folders in the output folder
-
-    // DONE: Extract lang code and version from folder name
-
-    // DONE: For each book
-
-        // DONE: For each chapter
-
-            // DONE: For each verse
-
-                // DONE: map verse into something that has "verse" and "interleavedVerse"
-
-                // TODO: insert into DB
-
 async function populate() {
+    dbModule.initialize()
+
     let directories = await getDirectories(INPUT_DIRECTORY_ROOT)
 
     for(let i = 0; i < directories.length; i++) {
@@ -49,6 +31,8 @@ async function populate() {
 
         }
     }
+
+    dbModule.close()
 }
 
 
@@ -69,7 +53,7 @@ function getLanguageAndVersion(projectName) {
     if (match) {
         const language = match[1]; 
         const version = match[2];
-        return {language: languageCodeMap[language], version: version}
+        return {language: language, version: version}
     } else {
         console.error(`Could not extract language code and version from project ${projectName}.`);
     }
@@ -130,11 +114,9 @@ function addChapterToDatabase(languageCode, version, bookName, chapterNumber, ch
             }
         })
 
-        const x = 1
-
+        dbModule.insert(languageCode, version, bookName, chapterNumber, alignedVerse.verseNum, plainText, interleavedText)
     });
 
 }
-
 
 populate()
