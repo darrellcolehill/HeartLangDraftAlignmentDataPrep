@@ -6,7 +6,10 @@ const fs = require('fs');
 const util = require('util');
 
 const readdir = util.promisify(fs.readdir);
-const INPUT_DIRECTORY_ROOT = "./documents"
+const INPUT_DIRECTORY_ROOT = "./input"
+const INPUT_DOCUMENTS_PATH = `${INPUT_DIRECTORY_ROOT}/documents`
+const INPUT_GWT_PATH = `${INPUT_DIRECTORY_ROOT}/gwt`
+
 
 // TODO: update this so that it works with other language codes like "hi"
 const languageCodeMap = {
@@ -17,15 +20,15 @@ const languageCodeMap = {
 
 async function setup(pk) {
     console.log("===== SETTING UP =====")
-    let directories = await getDirectories(INPUT_DIRECTORY_ROOT)
+    let directories = await getDirectories(`${INPUT_DOCUMENTS_PATH}`)
 
     for(let i = 0; i < directories.length; i++) {
         let {language, version} = getLanguageAndVersion(directories[i])
         
-        let usfmFiles = await getUsfmFiles(`${INPUT_DIRECTORY_ROOT}/${directories[i]}`)
+        let usfmFiles = await getUsfmFiles(`${INPUT_DOCUMENTS_PATH}/${directories[i]}`)
 
         for(let j = 0; j < usfmFiles.length; j++) {
-            const usfmFileContentPath = `${INPUT_DIRECTORY_ROOT}/${directories[i]}/${usfmFiles[j]}`
+            const usfmFileContentPath = `${INPUT_DOCUMENTS_PATH}/${directories[i]}/${usfmFiles[j]}`
             await addDocument(pk, usfmFileContentPath, language, version)
         }
     }
