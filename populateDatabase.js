@@ -1,5 +1,4 @@
 const path = require('path');
-const fse = require('fs-extra');
 const fs = require('fs');
 const util = require('util');
 const dbModule = require('./database');
