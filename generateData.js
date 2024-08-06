@@ -165,9 +165,13 @@ async function getAlignedVerses(pk, docSetID, bookDocumentID, bookCode, chapter)
 
     const jsonString = JSON.stringify(alignedVerses, null, 2);
 
-    // TODO: have this make a folder for each docSetID, and place the output there, That way it is not all one blob
+    if (!fs.existsSync(`./output/${docSetID}`)) {
+        fs.mkdirSync(path);
+    } else {
+        console.log('Folder already exists');
+    }
 
-    const filePath = `./output/${docSetID}-${bookCode}-${chapter}.json`;
+    const filePath = `./output/${docSetID}/${bookCode}-${chapter}.json`;
 
     fs.writeFile(filePath, jsonString, (err) => {
         if (err) {
