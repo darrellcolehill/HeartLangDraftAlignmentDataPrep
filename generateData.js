@@ -166,9 +166,7 @@ async function getAlignedVerses(pk, docSetID, bookDocumentID, bookCode, chapter)
     const jsonString = JSON.stringify(alignedVerses, null, 2);
 
     if (!fs.existsSync(`./output/${docSetID}`)) {
-        fs.mkdirSync(path);
-    } else {
-        console.log('Folder already exists');
+        fs.mkdirSync(`./output/${docSetID}`);
     }
 
     const filePath = `./output/${docSetID}/${bookCode}-${chapter}.json`;
