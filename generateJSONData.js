@@ -8,7 +8,7 @@ const util = require('util');
 const readdir = util.promisify(fs.readdir);
 const INPUT_DIRECTORY_ROOT = "./input"
 const INPUT_DOCUMENTS_PATH = `${INPUT_DIRECTORY_ROOT}/documents`
-const INPUT_GWT_PATH = `${INPUT_DIRECTORY_ROOT}/gwt`
+const INPUT_GWT_PATH = `${INPUT_DIRECTORY_ROOT}/en_gwt`
 
 
 // TODO: update this so that it works with other language codes like "hi"
@@ -142,7 +142,16 @@ async function getAlignedVerses(pk, docSetID, bookDocumentID, bookCode, chapter)
             let startingChar = text ===   "" ? "" : " "
             text += startingChar + attribute.payload;
         } else if(attribute.subType === "start" && attribute.payload.includes("x-strong")) {
-            greekAlignmentData.push({strong: getStrongs(attribute.payload)});
+            const strong = getStrongs(attribute.payload)
+
+            const gwtContent = await getGreekWordContent(strong)
+            if(gwtContent) {
+                const lemma = await getLemmaFromGWTContent(gwtContent)
+                if(lemma) {
+                    greekAlignmentData.push({strong: strong, lemma: lemma});
+                }
+            }
+
         } else if(attribute.subType === "end" && attribute.payload.includes("verse/")) {
             alignedVerses.push({verseNum: verseNum, alignedVerseText: alignedText})
             verseNum++;
@@ -196,6 +205,83 @@ async function getAlignedVerses(pk, docSetID, bookDocumentID, bookCode, chapter)
 }
 
 
+async function getGreekWordContent(strongs) {
+    let folder = await getStrongsRange(strongs);
+    let filePath = path.resolve(__dirname, `${INPUT_GWT_PATH}/${folder}/${strongs}.md`);
+
+    try {
+        if (fs.existsSync(filePath)) {
+            let content = fse.readFileSync(filePath).toString();
+            return content;
+        } else {
+            console.error('File does not exist:', filePath);
+        }
+    } catch (error) {
+        console.error('There has been a problem with your fetch operation:', error);
+    }
+}
+
+
+// Takes the target strongs number and calculates its parent folder in the en_gwt repo
+// This is greatly dependent on the current structure of the en_gwt
+function getStrongsRange(strongs) {
+	let thousandsDigit = strongs.charAt(1);
+	let hundredsDigit = strongs.charAt(2);
+	let tensDigit = strongs.charAt(3);
+	let onesDigit = strongs.charAt(4);
+
+	let strongsNumber =
+		thousandsDigit + hundredsDigit + tensDigit + onesDigit;
+
+	strongsNumber = parseInt(strongsNumber);
+
+	let startStrongsRangeNumber;
+	let endStrongsRangeNumber;
+
+	if (strongsNumber <= 10) {
+		return "g0001-g0010";
+	} else if (parseInt(onesDigit) == 0) {
+		startStrongsRangeNumber = strongsNumber - 9;
+		endStrongsRangeNumber = strongsNumber;
+	} else {
+		startStrongsRangeNumber =
+			strongsNumber - (strongsNumber % 10) + 1;
+		endStrongsRangeNumber =
+			strongsNumber - (strongsNumber % 10) + 10;
+	}
+
+	let startStrongsRangeString = `g${makeFourDigitStrongs(startStrongsRangeNumber)}`
+	let endStrongsRangeString = `g${makeFourDigitStrongs(endStrongsRangeNumber)}`
+
+	let strongsRange = `${startStrongsRangeString}-${endStrongsRangeString}`
+	return strongsRange.toLocaleLowerCase();
+}
+
+
+// Adds padding zeros (to the second character's posision) until it's length is 5
+function makeFourDigitStrongs(strongs) {
+    const match = `${strongs}`.match(/(\d+)/);
+    if (match) {
+        const number = match[1].padStart(4, '0');
+        return `${number}`;
+    } else {
+        console.error("Invalid input format.");
+    }
+}
+
+
+function getLemmaFromGWTContent(gwtContent) {
+    const regex = /#\s*([^\s/]+)/;
+    const match = gwtContent.match(regex);
+
+    if (match) {
+        const result = match[1];
+        return result
+    } else {
+        console.error("No match found.");
+    }
+}
+
 function getLemmaFromUsfm(str) {
     const regex = /[^/]+$/;
     const match = str.match(regex);
@@ -204,7 +290,7 @@ function getLemmaFromUsfm(str) {
         const lemma = match[0];
         return lemma
       } else {
-        console.log("No match found.");
+        console.error("No match found.");
       }
 }
 
