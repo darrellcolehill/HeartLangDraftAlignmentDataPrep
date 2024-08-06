@@ -19,7 +19,7 @@ const languageCodeMap = {
 
 
 async function setup(pk) {
-    console.log("===== SETTING UP =====")
+    console.log("===== ADDING DOCUMENTS TO GRAPH =====")
     let directories = await getDirectories(`${INPUT_DOCUMENTS_PATH}`)
 
     for(let i = 0; i < directories.length; i++) {
@@ -335,6 +335,8 @@ async function getBookChapterFormat(pk) {
 }
 
 async function processDocuments() {
+    console.log("======= PROCESSING DOCUMENTS ========")
+
     let loadedDocSets = await getBookChapterFormat(pk)
 
     loadedDocSets.forEach(docSet => {
