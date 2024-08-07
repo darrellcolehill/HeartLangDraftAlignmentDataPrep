@@ -71,7 +71,7 @@ async function getJsonFiles(directory) {
 
 
 function getBookNameAndChapter(str) {
-    const regex = /^([A-Z]+)-(\d+)\.json$/;
+    const regex = /^(\d*[A-Z]+)-(\d+)\.json$/;
     const match = str.match(regex);
     
     if (match) {
@@ -93,9 +93,12 @@ function addChapterToDatabase(languageCode, version, bookName, chapterNumber, ch
         alignedVerse.alignedVerseText.forEach(alignedWord => {
 
             // TODO: ask drew if this is correct. There are a lot of cases with just o <LEMMA>
-            const lemmas = alignedWord?.greekAlignmentData.map(it => {
-                return it.lemma
-            }).join(" ")
+            let lemmas
+            if(alignedWord.greekAlignmentData) {
+                lemmas = alignedWord?.greekAlignmentData.map(it => {
+                    return it.lemma
+                }).join(" ")
+            } 
 
             let leadingSpace = ""
             if(plainText !== "" || interleavedText !== "") {
