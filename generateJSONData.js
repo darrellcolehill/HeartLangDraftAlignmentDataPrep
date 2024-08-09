@@ -4,6 +4,7 @@ const { Proskomma } = require('proskomma');
 const pk = new Proskomma();
 const fs = require('fs');
 const util = require('util');
+const bookSlugs = require('./NewTestamentSlugs').bookSlugs
 
 const readdir = util.promisify(fs.readdir);
 const INPUT_DIRECTORY_ROOT = "./input"
@@ -14,7 +15,9 @@ const INPUT_GWT_PATH = `${INPUT_DIRECTORY_ROOT}/en_gwt`
 // TODO: update this so that it works with other language codes like "hi"
 const languageCodeMap = {
     "en": "eng",
-    "hi": "hin"
+    "hi": "hin",
+    "ne": "nep",
+    "vi": "vie"
 }
 
 
@@ -28,8 +31,15 @@ async function setup(pk) {
         let usfmFiles = await getUsfmFiles(`${INPUT_DOCUMENTS_PATH}/${directories[i]}`)
 
         for(let j = 0; j < usfmFiles.length; j++) {
-            const usfmFileContentPath = `${INPUT_DOCUMENTS_PATH}/${directories[i]}/${usfmFiles[j]}`
-            await addDocument(pk, usfmFileContentPath, language, version)
+            // removes '.usfm'
+            let bookName = usfmFiles[j].slice(0, -5);
+            // Verifies that book is a New Testament book
+            const bookExists = Object.values(bookSlugs).some(bookSlug => bookSlug.abbreviatedBook === bookName);
+
+            if(bookExists) {
+                const usfmFileContentPath = `${INPUT_DOCUMENTS_PATH}/${directories[i]}/${usfmFiles[j]}`
+                await addDocument(pk, usfmFileContentPath, language, version)
+            }
         }
     }
 }
@@ -58,6 +68,7 @@ function getLanguageAndVersion(projectName) {
     }
 }
 
+
 async function getUsfmFiles(directory) {
     try {
         const files = await readdir(directory);
@@ -67,6 +78,7 @@ async function getUsfmFiles(directory) {
         return [];
     }
 }
+
 
 async function addDocument(pk, contentPath, language, version) {
     let content = fse.readFileSync(path.resolve(__dirname, contentPath)).toString();
@@ -173,21 +185,7 @@ async function getAlignedVerses(pk, docSetID, bookDocumentID, bookCode, chapter)
         }
     }
 
-    const jsonString = JSON.stringify(alignedVerses, null, 2);
-
-    if (!fs.existsSync(`./output/${docSetID}`)) {
-        fs.mkdirSync(`./output/${docSetID}`);
-    }
-
-    const filePath = `./output/${docSetID}/${bookCode}-${chapter}.json`;
-
-    fs.writeFile(filePath, jsonString, (err) => {
-        if (err) {
-            console.error('Error writing to file', err);
-        } else {
-            console.log(`Saved JSON for ${bookCode}`);
-        }
-    });
+    writeAlignedVersesToJson(docSetID, bookCode, chapter, alignedVerses)
  }
 
 
@@ -200,7 +198,7 @@ async function getAlignedVerses(pk, docSetID, bookDocumentID, bookCode, chapter)
         const strong = 'g' + match[1];
         return strong;
     } else {
-        console.log("No match found.");
+        console.error(`Could not match strongs for: ${str}`);
     }
 }
 
@@ -214,7 +212,7 @@ async function getGreekWordContent(strongs) {
             let content = fse.readFileSync(filePath).toString();
             return content;
         } else {
-            console.error('File does not exist:', filePath);
+            console.error(`${strongs} not found`);
         }
     } catch (error) {
         console.error('There has been a problem with your fetch operation:', error);
@@ -278,9 +276,10 @@ function getLemmaFromGWTContent(gwtContent) {
         const result = match[1];
         return result
     } else {
-        console.error("No match found.");
+        console.error(`Could not match lemma: ${gwtContent}`);
     }
 }
+
 
 function getLemmaFromUsfm(str) {
     const regex = /[^/]+$/;
@@ -294,6 +293,25 @@ function getLemmaFromUsfm(str) {
       }
 }
 
+
+function writeAlignedVersesToJson(docSetID, bookCode, chapter, alignedVerses) {
+
+    const jsonString = JSON.stringify(alignedVerses, null, 2);
+
+    if (!fs.existsSync(`./output/${docSetID}`)) {
+        fs.mkdirSync(`./output/${docSetID}`);
+    }
+
+    const filePath = `./output/${docSetID}/${bookCode}-${chapter}.json`;
+
+    fs.writeFile(filePath, jsonString, (err) => {
+        if (err) {
+            console.error('Error writing to file', err);
+        } else {
+            console.log(`Saved JSON for ${bookCode}`);
+        }
+    });
+}
 
 async function getBookChapterFormat(pk) {
 
@@ -311,7 +329,6 @@ async function getBookChapterFormat(pk) {
         }
     }
     `
-
     const result = await pk.gqlQuery(bookChapterQuery);
 
     const mappedDocSets = result.data.docSets.map( docSet => {
@@ -334,6 +351,7 @@ async function getBookChapterFormat(pk) {
     return mappedDocSets
 }
 
+
 async function processDocuments() {
     console.log("======= PROCESSING DOCUMENTS ========")
 
@@ -344,9 +362,8 @@ async function processDocuments() {
             processBook(docSet.id, document)
         })
     })
-
-    
 }
+
 
 async function processBook(docSetID, bookDocument) {
     for(let i = 1; i <= bookDocument.chapters; i++) {
