@@ -1,14 +1,8 @@
-const { Worker, isMainThread, parentPort } = require('worker_threads');
+const { Worker } = require('worker_threads');
 const path = require('path');
-
-
-// TODO: remove this
-// Define the language and version pairs
-const languageVersionPairs = [
-    { language: 'en', version: 'ult' },
-    // { language: 'en', version: 'ust' },
-    // { language: 'hin', version: 'gst' }
-];
+const { getDirectories, getLanguageAndVersion } = require('./utils');
+const INPUT_DIRECTORY_ROOT = "./input"
+const INPUT_DOCUMENTS_PATH = `${INPUT_DIRECTORY_ROOT}/documents`
 
 
 // Function to create a worker thread for each language-version pair
@@ -40,14 +34,22 @@ function runWorker(language, version) {
 
 // Create workers for all language-version pairs
 async function generateData() {
+    const inputBiblesPath = await getDirectories(`${INPUT_DOCUMENTS_PATH}`)
+    const allLanguageVersionPairs = inputBiblesPath.map(inputBiblePath => {
+        let {language, version} = getLanguageAndVersion(inputBiblePath)
+        return {language: language, version: version}
+    })
+    
     // Create an array of promises for all workers
-    const workerPromises = languageVersionPairs.map(({ language, version }) => {
+    const workerPromises = allLanguageVersionPairs.map(({ language, version }) => {
         return runWorker(language, version).catch(error => {
             console.error(`Error running worker for ${language}_${version}:`, error);
             // Returning a resolved promise to ensure Promise.all still completes even if one worker fails
             return Promise.resolve();
         });
     });
+
+
 
     // Wait for all worker promises to complete
     try {
