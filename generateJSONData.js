@@ -1,7 +1,6 @@
 const path = require('path');
 const fse = require('fs-extra');
 const { Proskomma } = require('proskomma');
-const pk = new Proskomma();
 const fs = require('fs');
 const util = require('util');
 const bookSlugs = require('./NewTestamentSlugs').bookSlugs
@@ -373,6 +372,10 @@ async function processBook(docSetID, bookDocument) {
 
 
 async function main(){
+
+    // TODO: start thread pool here. For each lang_version in documents, start a thread with that bible. 
+    const pk = new Proskomma();
+
     await setup(pk)
     processDocuments()
 }
