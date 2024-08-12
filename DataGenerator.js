@@ -27,7 +27,7 @@ class DataGenerator {
 
             if (bookExists) {
                 const usfmFileContentPath = `${INPUT_DOCUMENTS_PATH}/${language}_${version}/${usfmFiles[j]}`;
-                await this.addDocument(pk, usfmFileContentPath, languageCodeMap[language], version);
+                await this.addDocument(pk, usfmFileContentPath, language, version);
             }
         }
         
