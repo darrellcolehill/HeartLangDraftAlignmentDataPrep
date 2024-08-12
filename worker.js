@@ -3,7 +3,7 @@ const fse = require('fs-extra');
 const { Proskomma } = require('proskomma');
 const fs = require('fs');
 const util = require('util');
-const bookSlugs = require('./NewTestamentSlugs').bookSlugs
+const bookSlugs = require('./mapping/NewTestamentSlugs').bookSlugs
 const { parentPort, workerData } = require('worker_threads');
 
 const readdir = util.promisify(fs.readdir);

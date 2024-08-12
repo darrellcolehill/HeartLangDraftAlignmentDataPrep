@@ -2,12 +2,13 @@ const { Worker, isMainThread, parentPort } = require('worker_threads');
 const path = require('path');
 
 
-// Define the language and version pairs
-const languageVersionPairs = [
-    { language: 'eng', version: 'ult' },
-    { language: 'eng', version: 'ust' },
-    { language: 'hin', version: 'gst' }
-];
+// TODO: remove this
+// // Define the language and version pairs
+// const languageVersionPairs = [
+//     { language: 'eng', version: 'ult' },
+//     { language: 'eng', version: 'ust' },
+//     { language: 'hin', version: 'gst' }
+// ];
 
 
 // Function to create a worker thread for each language-version pair
@@ -38,7 +39,7 @@ function runWorker(language, version) {
 
 
 // Create workers for all language-version pairs
-async function runAllWorkers() {
+async function generateData() {
     // Create an array of promises for all workers
     const workerPromises = languageVersionPairs.map(({ language, version }) => {
         return runWorker(language, version).catch(error => {
@@ -58,5 +59,6 @@ async function runAllWorkers() {
 }
 
 
-// Run all worker threads
-runAllWorkers();
+module.exports = {
+    generateData
+};

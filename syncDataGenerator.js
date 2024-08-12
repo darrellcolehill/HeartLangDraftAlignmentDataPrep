@@ -3,21 +3,13 @@ const fse = require('fs-extra');
 const { Proskomma } = require('proskomma');
 const fs = require('fs');
 const util = require('util');
-const bookSlugs = require('./NewTestamentSlugs').bookSlugs
+const bookSlugs = require('./mapping/NewTestamentSlugs').bookSlugs
+const languageCodeMap = require('./mapping/languageCodeMap').languageCodeMap
 
 const readdir = util.promisify(fs.readdir);
 const INPUT_DIRECTORY_ROOT = "./input"
 const INPUT_DOCUMENTS_PATH = `${INPUT_DIRECTORY_ROOT}/documents`
 const INPUT_GWT_PATH = `${INPUT_DIRECTORY_ROOT}/en_gwt`
-
-
-// TODO: update this so that it works with other language codes like "hi"
-const languageCodeMap = {
-    "en": "eng",
-    "hi": "hin",
-    "ne": "nep",
-    "vi": "vie"
-}
 
 
 async function setup(pk) {
@@ -351,30 +343,32 @@ async function getBookChapterFormat(pk) {
 }
 
 
-async function processDocuments() {
+async function processDocuments(pk) {
     console.log("======= PROCESSING DOCUMENTS ========")
 
     let loadedDocSets = await getBookChapterFormat(pk)
 
     loadedDocSets.forEach(docSet => {
         docSet.documents.forEach(document => {
-            processBook(docSet.id, document)
+            processBook(pk, docSet.id, document)
         })
     })
 }
 
 
-async function processBook(docSetID, bookDocument) {
+async function processBook(pk, docSetID, bookDocument) {
     for(let i = 1; i <= bookDocument.chapters; i++) {
         getAlignedVerses(pk, docSetID, bookDocument.id, bookDocument.slug, i)
     }
 }
 
 
-async function main(){
+async function generateData(){
     const pk = new Proskomma();
     await setup(pk)
-    processDocuments()
+    processDocuments(pk)
 }
 
-main()
+module.exports = {
+    generateData
+};
