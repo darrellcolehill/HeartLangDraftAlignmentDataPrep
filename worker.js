@@ -4,6 +4,7 @@ const { Proskomma } = require('proskomma');
 const fs = require('fs');
 const util = require('util');
 const bookSlugs = require('./NewTestamentSlugs').bookSlugs
+const { parentPort, workerData } = require('worker_threads');
 
 const readdir = util.promisify(fs.readdir);
 const INPUT_DIRECTORY_ROOT = "./input"
@@ -20,24 +21,24 @@ const languageCodeMap = {
 }
 
 
-async function setup(pk) {
-    console.log("===== ADDING DOCUMENTS TO GRAPH =====")
-    let directories = await getDirectories(`${INPUT_DOCUMENTS_PATH}`)
+async function setup(pk, language, version) {
+    console.log(`===== ADDING DOCUMENTS TO GRAPH FOR ${language}_${version} =====`);
+    let directories = await getDirectories(`${INPUT_DOCUMENTS_PATH}`);
 
-    for(let i = 0; i < directories.length; i++) {
-        let {language, version} = getLanguageAndVersion(directories[i])
-        
-        let usfmFiles = await getUsfmFiles(`${INPUT_DOCUMENTS_PATH}/${directories[i]}`)
+    for (let i = 0; i < directories.length; i++) {
+        let { language: lang, version: ver } = getLanguageAndVersion(directories[i]);
 
-        for(let j = 0; j < usfmFiles.length; j++) {
-            // removes '.usfm'
-            let bookName = usfmFiles[j].slice(0, -5);
-            // Verifies that book is a New Testament book
-            const bookExists = Object.values(bookSlugs).some(bookSlug => bookSlug.abbreviatedBook === bookName);
+        if (lang === language && ver === version) {
+            let usfmFiles = await getUsfmFiles(`${INPUT_DOCUMENTS_PATH}/${directories[i]}`);
 
-            if(bookExists) {
-                const usfmFileContentPath = `${INPUT_DOCUMENTS_PATH}/${directories[i]}/${usfmFiles[j]}`
-                await addDocument(pk, usfmFileContentPath, language, version)
+            for (let j = 0; j < usfmFiles.length; j++) {
+                let bookName = usfmFiles[j].slice(0, -5);
+                const bookExists = Object.values(bookSlugs).some(bookSlug => bookSlug.abbreviatedBook === bookName);
+
+                if (bookExists) {
+                    const usfmFileContentPath = `${INPUT_DOCUMENTS_PATH}/${directories[i]}/${usfmFiles[j]}`;
+                    await addDocument(pk, usfmFileContentPath, language, version);
+                }
             }
         }
     }
@@ -127,64 +128,69 @@ async function getAlignedVerses(pk, docSetID, bookDocumentID, bookCode, chapter)
     }
     `;
 
-    const result = await pk.gqlQuery(dataQuery);
-    let cvData = result.data.docSet.documents[0].cv[0].items.filter((item) => 
-        item.payload === "milestone/zaln" || item.subType === "wordLike" 
-        || (item.payload.includes("x-strong") && item.subType === "start")
-        || (item.payload.includes("x-lemma") && item.subType === "start")
-        || item.payload.includes("verse/")
-    )
+    try {
+        const result = await pk.gqlQuery(dataQuery);
 
-    let alignedVerses = [];
-    let alignedText = [];
-    let alignStartCount = 0; 
-    let text = "";
-    let greekAlignmentData = []
-    let verseNum = 1;
+        let cvData = result.data.docSet.documents[0].cv[0].items.filter((item) => 
+            item.payload === "milestone/zaln" || item.subType === "wordLike" 
+            || (item.payload.includes("x-strong") && item.subType === "start")
+            || (item.payload.includes("x-lemma") && item.subType === "start")
+            || item.payload.includes("verse/")
+        )
 
-    for(let i = 0; i < cvData.length; i++) {
-        let attribute = cvData[i];
+        let alignedVerses = [];
+        let alignedText = [];
+        let alignStartCount = 0; 
+        let text = "";
+        let greekAlignmentData = []
+        let verseNum = 1;
 
-        if(attribute.subType === "start" && attribute.payload === "milestone/zaln") {
-            alignStartCount++; 
-        } else if(attribute.subType === "end" && attribute.payload === "milestone/zaln") {
-            alignStartCount--; 
-        } else if(attribute.subType === "wordLike") {
-            let startingChar = text ===   "" ? "" : " "
-            text += startingChar + attribute.payload;
-        } else if(attribute.subType === "start" && attribute.payload.includes("x-strong")) {
-            const strong = getStrongs(attribute.payload)
+        for(let i = 0; i < cvData.length; i++) {
+            let attribute = cvData[i];
 
-            const gwtContent = await getGreekWordContent(strong)
-            if(gwtContent) {
-                const lemma = await getLemmaFromGWTContent(gwtContent)
-                if(lemma) {
-                    greekAlignmentData.push({strong: strong, lemma: lemma});
+            if(attribute.subType === "start" && attribute.payload === "milestone/zaln") {
+                alignStartCount++; 
+            } else if(attribute.subType === "end" && attribute.payload === "milestone/zaln") {
+                alignStartCount--; 
+            } else if(attribute.subType === "wordLike") {
+                let startingChar = text ===   "" ? "" : " "
+                text += startingChar + attribute.payload;
+            } else if(attribute.subType === "start" && attribute.payload.includes("x-strong")) {
+                const strong = getStrongs(attribute.payload)
+
+                const gwtContent = await getGreekWordContent(strong)
+                if(gwtContent) {
+                    const lemma = await getLemmaFromGWTContent(gwtContent)
+                    if(lemma) {
+                        greekAlignmentData.push({strong: strong, lemma: lemma});
+                    }
                 }
+
+            } else if(attribute.subType === "end" && attribute.payload.includes("verse/")) {
+                alignedVerses.push({verseNum: verseNum, alignedVerseText: alignedText})
+                verseNum++;
+                alignedText = []
             }
 
-        } else if(attribute.subType === "end" && attribute.payload.includes("verse/")) {
-            alignedVerses.push({verseNum: verseNum, alignedVerseText: alignedText})
-            verseNum++;
-            alignedText = []
-        }
+            if(alignStartCount === 0 && text != "") {
 
-        if(alignStartCount === 0 && text != "") {
+                // Push alignment text
+                if(greekAlignmentData.length > 0) {
+                    alignedText.push({text: text, greekAlignmentData: greekAlignmentData});
+                } else {
+                    alignedText.push({text: text});
+                }
 
-            // Push alignment text
-            if(greekAlignmentData.length > 0) {
-                alignedText.push({text: text, greekAlignmentData: greekAlignmentData});
-            } else {
-                alignedText.push({text: text});
+                // reset buffers
+                text = "";
+                greekAlignmentData = [];
             }
-
-            // reset buffers
-            text = "";
-            greekAlignmentData = [];
         }
+
+        await writeAlignedVersesToJson(docSetID, bookCode, chapter, alignedVerses)
+    } catch(err) {
+        console.log(err)
     }
-
-    writeAlignedVersesToJson(docSetID, bookCode, chapter, alignedVerses)
  }
 
 
@@ -293,23 +299,28 @@ function getLemmaFromUsfm(str) {
 }
 
 
-function writeAlignedVersesToJson(docSetID, bookCode, chapter, alignedVerses) {
-
-    const jsonString = JSON.stringify(alignedVerses, null, 2);
-
-    if (!fs.existsSync(`./output/${docSetID}`)) {
-        fs.mkdirSync(`./output/${docSetID}`);
+async function writeAlignedVersesToJson(docSetID, bookCode, chapter, alignedVerses) {
+    // TODO: Figure out why this is not working 
+    try {
+        const jsonString = JSON.stringify(alignedVerses, null, 2);
+        const fileExists = await fs.existsSync(`./output/${docSetID}`)
+        if (!fileExists) {
+            await fs.mkdirSync(`./output/${docSetID}`);
+        }
+    
+        const filePath = `./output/${docSetID}/${bookCode}-${chapter}.json`;
+    
+        await fs.writeFile(filePath, jsonString, (err) => {
+            if (err) {
+                console.error('Error writing to file', err);
+            } else {
+                console.log(`Saved JSON for ${bookCode}`);
+            }
+        });
+    } catch (error) {
+        console.log("Error")
     }
 
-    const filePath = `./output/${docSetID}/${bookCode}-${chapter}.json`;
-
-    fs.writeFile(filePath, jsonString, (err) => {
-        if (err) {
-            console.error('Error writing to file', err);
-        } else {
-            console.log(`Saved JSON for ${bookCode}`);
-        }
-    });
 }
 
 async function getBookChapterFormat(pk) {
@@ -351,33 +362,47 @@ async function getBookChapterFormat(pk) {
 }
 
 
-async function processDocuments() {
+async function processDocuments(pk) {
     console.log("======= PROCESSING DOCUMENTS ========")
 
     let loadedDocSets = await getBookChapterFormat(pk)
 
-    loadedDocSets.forEach(docSet => {
-        docSet.documents.forEach(document => {
-            processBook(docSet.id, document)
+    loadedDocSets.forEach(async docSet => {
+        docSet.documents.forEach(async document => {
+            await processBook(pk, docSet.id, document)
         })
     })
 }
 
 
-async function processBook(docSetID, bookDocument) {
+async function processBook(pk, docSetID, bookDocument) {
     for(let i = 1; i <= bookDocument.chapters; i++) {
-        getAlignedVerses(pk, docSetID, bookDocument.id, bookDocument.slug, i)
+        await getAlignedVerses(pk, docSetID, bookDocument.id, bookDocument.slug, i)
+    }
+}
+process.on('uncaughtException', (err) => {
+    console.error('Uncaught Exception:', err);
+    parentPort.postMessage(`Error: ${err.message}`);
+});
+
+process.on('unhandledRejection', (err) => {
+    console.error('Unhandled Rejection:', err);
+    parentPort.postMessage(`Error: ${err.message}`);
+});
+
+async function main() {
+    const { language, version } = workerData;
+    console.log(`Processing ${language} and ${version}...`);
+    
+    try {
+        const pk = new Proskomma();
+        await setup(pk, language, version);
+        await processDocuments(pk);
+        parentPort.postMessage(`Completed processing for ${language}_${version}`);
+    } catch (error) {
+        console.error(`Error processing ${language}_${version}:`, error);
+        parentPort.postMessage(`Error: ${error.message}`);
     }
 }
 
-
-async function main(){
-
-    // TODO: start thread pool here. For each lang_version in documents, start a thread with that bible. 
-    const pk = new Proskomma();
-
-    await setup(pk)
-    processDocuments()
-}
-
-main()
+main();
