@@ -10,6 +10,7 @@ const readdir = util.promisify(fs.readdir);
 const INPUT_DIRECTORY_ROOT = "./input"
 const INPUT_DOCUMENTS_PATH = `${INPUT_DIRECTORY_ROOT}/documents`
 const INPUT_GWT_PATH = `${INPUT_DIRECTORY_ROOT}/en_gwt`
+const { getLanguageAndVersion, getDirectories } = require('./utils/index')
 
 
 
@@ -34,10 +35,10 @@ class DataGenerator {
 
     async setup(pk) {
         console.log("===== ADDING DOCUMENTS TO GRAPH =====")
-        let directories = await this.getDirectories(`${INPUT_DOCUMENTS_PATH}`)
+        let directories = await getDirectories(`${INPUT_DOCUMENTS_PATH}`)
 
         for(let i = 0; i < directories.length; i++) {
-            let {language, version} = this.getLanguageAndVersion(directories[i])
+            let {language, version} = getLanguageAndVersion(directories[i])
             
             let usfmFiles = await this.getUsfmFiles(`${INPUT_DOCUMENTS_PATH}/${directories[i]}`)
 
@@ -52,30 +53,6 @@ class DataGenerator {
                     await this.addDocument(pk, usfmFileContentPath, language, version)
                 }
             }
-        }
-    }
-
-
-    async getDirectories(source) {
-        return (await readdir(source, { withFileTypes: true }))
-        .filter(dirent => dirent.isDirectory())
-        .map(dirent => dirent.name)
-    }
-
-
-    getLanguageAndVersion(projectName) {
-
-        // Extracts the language and version from aligned bibles on Door43 from projects in the from of
-        // langCode_version
-        const repoNamePattern = /^([^_]+)_(.+)$/;
-        const match = projectName.match(repoNamePattern);
-
-        if (match) {
-            const language = match[1]; 
-            const version = match[2];
-            return {language: languageCodeMap[language], version: version}
-        } else {
-            console.error(`Could not extract language code and version from project ${projectName}.`);
         }
     }
 
@@ -95,7 +72,7 @@ class DataGenerator {
         let content = fse.readFileSync(path.resolve(__dirname, contentPath)).toString();
 
         const mutation = `mutation { addDocument(` +
-        `selectors: [{key: "lang", value: "${language}"}, {key: "abbr", value: "${version}"}], ` +
+        `selectors: [{key: "lang", value: "${languageCodeMap[language]}"}, {key: "abbr", value: "${version}"}], ` +
         `contentType: "usfm", ` +
         `content: """${content}""") }`;
 

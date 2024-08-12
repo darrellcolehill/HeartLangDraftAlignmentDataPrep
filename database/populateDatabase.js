@@ -2,6 +2,7 @@ const path = require('path');
 const fs = require('fs');
 const util = require('util');
 const dbModule = require('./database');
+const { getLanguageAndVersion, getDirectories } = require('../utils/index')
 
 const readdir = util.promisify(fs.readdir);
 const INPUT_DIRECTORY_ROOT = "./output"
@@ -32,30 +33,6 @@ async function populate() {
     }
 
     dbModule.close()
-}
-
-
-async function getDirectories(source) {
-    return (await readdir(source, { withFileTypes: true }))
-        .filter(dirent => dirent.isDirectory())
-        .map(dirent => dirent.name)
-}
-
-
-function getLanguageAndVersion(projectName) {
-
-    // Extracts the language and version from aligned bibles on Door43 from projects in the from of
-    // langCode_version
-    const repoNamePattern = /^([^_]+)_(.+)$/;
-    const match = projectName.match(repoNamePattern);
-
-    if (match) {
-        const language = match[1]; 
-        const version = match[2];
-        return {language: language, version: version}
-    } else {
-        console.error(`Could not extract language code and version from project ${projectName}.`);
-    }
 }
 
 
