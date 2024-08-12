@@ -372,10 +372,7 @@ async function processBook(docSetID, bookDocument) {
 
 
 async function main(){
-
-    // TODO: start thread pool here. For each lang_version in documents, start a thread with that bible. 
     const pk = new Proskomma();
-
     await setup(pk)
     processDocuments()
 }
