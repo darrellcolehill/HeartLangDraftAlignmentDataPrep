@@ -3,12 +3,12 @@ const path = require('path');
 
 
 // TODO: remove this
-// // Define the language and version pairs
-// const languageVersionPairs = [
-//     { language: 'eng', version: 'ult' },
-//     { language: 'eng', version: 'ust' },
-//     { language: 'hin', version: 'gst' }
-// ];
+// Define the language and version pairs
+const languageVersionPairs = [
+    { language: 'en', version: 'ult' },
+    // { language: 'en', version: 'ust' },
+    // { language: 'hin', version: 'gst' }
+];
 
 
 // Function to create a worker thread for each language-version pair
@@ -58,7 +58,4 @@ async function generateData() {
     }
 }
 
-
-module.exports = {
-    generateData
-};
+generateData()
