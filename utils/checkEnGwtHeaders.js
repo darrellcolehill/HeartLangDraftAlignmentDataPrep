@@ -1,7 +1,7 @@
 const fs = require('fs').promises;
 const path = require('path');
 
-const EN_GWT_PATH = "./input/en_gwt";
+const EN_GWT_PATH = "../input/en_gwt";
 
 async function checkEnGwtHeaders() {
     let directories = await getDirectories(EN_GWT_PATH);
