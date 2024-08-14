@@ -363,7 +363,7 @@ class DataGenerator {
         const pk = new Proskomma();
 
         if(!language && !version) {
-            await this.setup()
+            await this.setup(pk)
         } else {
             await this.setupLangVersion(pk, language, version)
         }
