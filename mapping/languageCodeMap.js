@@ -6,6 +6,7 @@ const languageCodeMap = {
     "vi": "vie",
     "mr": "mar",
     "bn": "ben",
+    "ru": "rus",
 }
 
 module.exports = {
