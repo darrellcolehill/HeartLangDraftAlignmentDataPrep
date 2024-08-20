@@ -3,7 +3,9 @@ const languageCodeMap = {
     "en": "eng",
     "hi": "hin",
     "ne": "nep",
-    "vi": "vie"
+    "vi": "vie",
+    "mr": "mar",
+    "bn": "ben",
 }
 
 module.exports = {
