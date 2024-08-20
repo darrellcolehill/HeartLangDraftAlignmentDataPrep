@@ -7,6 +7,11 @@ const languageCodeMap = {
     "mr": "mar",
     "bn": "ben",
     "ru": "rus",
+    "or": "ori",
+    "gu": "guj",
+    "kn": "kan",
+    "te": "tei",
+    "ur": "urd"
 }
 
 module.exports = {
