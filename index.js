@@ -1,12 +1,12 @@
 const { Worker } = require('worker_threads');
 const path = require('path');
 const { getDirectories, getLanguageAndVersion } = require('./utils');
-const INPUT_DIRECTORY_ROOT = "./input"
-const INPUT_DOCUMENTS_PATH = `${INPUT_DIRECTORY_ROOT}/documents`
+const INPUT_DIRECTORY_ROOT = "./input";
+const INPUT_DOCUMENTS_PATH = `${INPUT_DIRECTORY_ROOT}/documents`;
 const dbModule = require('./database/database');
 const DatabasePopulator = require('./database/DatabasePopulator');
 const UgntDataGenerator = require('./UgntDataGenerator');
-const DataGenerator = require('./DataGenerator')
+const DataGenerator = require('./DataGenerator');
 
 
 // Function to create a worker thread for each language-version pair

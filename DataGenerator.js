@@ -349,7 +349,7 @@ class DataGenerator {
 
         const filePath = `./output/${docSetID}/${bookCode}-${chapter}.json`;
 
-        fs.writeFile(filePath, jsonString, (err) => {
+        fs.writeFileSync(filePath, jsonString, (err) => {
             if (err) {
                 console.error('Error writing to file', err);
             } else {
@@ -402,11 +402,11 @@ class DataGenerator {
 
         let loadedDocSets = await this.getBookChapterFormat(pk)
 
-        loadedDocSets.forEach(docSet => {
-            docSet.documents.forEach(document => {
+        for (const docSet of loadedDocSets) {
+            for (const document of docSet.documents) {
                 this.processBook(pk, docSet.id, document)
-            })
-        })
+            }
+        }
     }
 
 
