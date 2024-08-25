@@ -3,6 +3,10 @@ const path = require('path');
 const { getDirectories, getLanguageAndVersion } = require('./utils');
 const INPUT_DIRECTORY_ROOT = "./input"
 const INPUT_DOCUMENTS_PATH = `${INPUT_DIRECTORY_ROOT}/documents`
+const dbModule = require('./database/database');
+const DatabasePopulator = require('./database/DatabasePopulator');
+const UgntDataGenerator = require('./UgntDataGenerator');
+const DataGenerator = require('./DataGenerator')
 
 
 // Function to create a worker thread for each language-version pair
@@ -60,4 +64,21 @@ async function generateData() {
     }
 }
 
-generateData()
+// generateData()
+
+async function main() {
+    dbModule.initialize()
+    const dataGenerator = new DataGenerator()
+    await dataGenerator.generateData("en", "ult")
+
+    const databasePopulator = new DatabasePopulator(dbModule)
+    await databasePopulator.populate()
+
+    const ugntDataGenerator = new UgntDataGenerator()
+    await ugntDataGenerator.generateData(dbModule)
+
+    await dbModule.sort()
+    dbModule.close()
+}
+
+main()
